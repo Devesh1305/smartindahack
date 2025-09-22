@@ -1,53 +1,69 @@
 import cv2
 from ultralytics import YOLO
 
-# Load YOLOv11 model (replace with your model path if needed)
-model = YOLO("yolo11n.pt")  # 'n' = nano version (lightweight)
+# Load YOLOv11 model (nano version)
+model = YOLO("yolo11n.pt")
 
-# Open camera (0 = default, change if needed)
+# Open camera (0 = default)
 cap = cv2.VideoCapture(0)
 
+# Set resolution
+cap.set(3, 320)  # width
+cap.set(4, 240)  # height
+
 prev_area = None
+frame_count = 0
+skip_rate = 3  # Run YOLO on every 3rd frame
+
+last_box = None
+last_status = "Detecting..."
 
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    # Run YOLO detection
-    results = model(frame, verbose=False)
+    frame_count += 1
 
-    # Get first detection (you can modify to pick specific class)
-    for r in results:
-        boxes = r.boxes
-        if len(boxes) > 0:
-            # Take the biggest box (largest area)
-            biggest_box = max(boxes, key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1]))
+    # Run YOLO only on every Nth frame
+    if frame_count % skip_rate == 0:
+        results = model(frame, verbose=False)
 
-            # Extract coordinates
-            x1, y1, x2, y2 = biggest_box.xyxy[0]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+        for r in results:
+            boxes = r.boxes
+            if len(boxes) > 0:
+                # Take the biggest box
+                biggest_box = max(
+                    boxes,
+                    key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1])
+                )
 
-            # Compute area of bounding box
-            area = (x2 - x1) * (y2 - y1)
+                x1, y1, x2, y2 = biggest_box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
 
-            # Compare with previous area
-            if prev_area is not None:
-                if area > prev_area * 1.1:  # 10% threshold
-                    status = "Getting closer"
-                elif area < prev_area * 0.9:
-                    status = "Moving further"
+                # Compute area
+                area = (x2 - x1) * (y2 - y1)
+
+                # Compare with previous area
+                if prev_area is not None:
+                    if area > prev_area * 1.1:
+                        last_status = "Getting closer"
+                    elif area < prev_area * 0.9:
+                        last_status = "Moving further"
+                    else:
+                        last_status = "Stable"
                 else:
-                    status = "Stable"
-            else:
-                status = "Detecting..."
+                    last_status = "Detecting..."
 
-            prev_area = area
+                prev_area = area
+                last_box = (x1, y1, x2, y2)
 
-            # Draw box + label
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, status, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+    # Draw last known box + status (even on skipped frames)
+    if last_box is not None:
+        x1, y1, x2, y2 = last_box
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(frame, last_status, (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
 
     cv2.imshow("YOLO Object Distance Estimation", frame)
 
