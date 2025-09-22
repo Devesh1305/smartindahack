@@ -5,7 +5,7 @@ from ultralytics import YOLO
 model = YOLO("yolo11n.pt")  # 'n' = nano version (lightweight)
 
 # Open camera (0 = default, change if needed)
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture("/dev/video10")  # replace with your detected video device
 
 prev_area = None
 
@@ -56,3 +56,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+
