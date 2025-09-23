@@ -4,14 +4,14 @@ import threading
 from dronekit import connect, VehicleMode
 import time
 
-# --- Connect to Pixhawk (USB or UART) ---
-# USB example: '/dev/ttyACM0'
-# TELEM2 example: '/dev/serial0'
-vehicle = connect('/dev/ttyACM0', baud=57600, wait_ready=True)
+# --- Connect to Pixhawk 6X via TELEM2 UART ---
+# Use '/dev/serial0' for GPIO14/15 UART connection
+vehicle = connect('/dev/serial0', baud=57600, wait_ready=True)
 
 # Load YOLO model
 model = YOLO("yolo11n.pt")
 
+# Open camera
 cap = cv2.VideoCapture(0)
 cap.set(3, 640)
 cap.set(4, 480)
@@ -21,8 +21,8 @@ last_box = None
 last_status = "Detecting..."
 lock = threading.Lock()
 
-# Threshold area to trigger "go back"
-THRESHOLD_AREA = 40000  # Based on your trigger frame
+# Threshold area (from your trigger frame)
+THRESHOLD_AREA = 40000
 
 def detect(frame_small):
     global last_box, last_status, prev_area
@@ -50,15 +50,16 @@ def detect(frame_small):
                 last_status = status
 
 def go_back():
-    """Send velocity command to Pixhawk to move backward"""
+    """Send velocity command to Pixhawk 6X to move backward"""
     if vehicle.mode.name != "GUIDED":
         vehicle.mode = VehicleMode("GUIDED")
         time.sleep(1)
 
-    send_body_velocity(-0.5, 0, 0)  # -0.5 m/s backward
+    # -0.3 m/s backward (tune speed as needed)
+    send_body_velocity(-0.3, 0, 0)
 
 def send_body_velocity(vx, vy, vz):
-    """Move vehicle in body frame"""
+    """Send velocity command in local NED frame"""
     msg = vehicle.message_factory.set_position_target_local_ned_encode(
         0,  # time_boot_ms
         0, 0,  # target system, target component
