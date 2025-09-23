@@ -1,30 +1,35 @@
 import cv2
 from ultralytics import YOLO
 import threading
+from dronekit import connect, VehicleMode
+import time
 
-# Load YOLOv11 nano model
+# --- Connect to Pixhawk (USB or UART) ---
+# USB example: '/dev/ttyACM0'
+# TELEM2 example: '/dev/serial0'
+vehicle = connect('/dev/ttyACM0', baud=57600, wait_ready=True)
+
+# Load YOLO model
 model = YOLO("yolo11n.pt")
 
-# Open camera
 cap = cv2.VideoCapture(0)
-cap.set(3, 640)  # Display width
-cap.set(4, 480)  # Display height
+cap.set(3, 640)
+cap.set(4, 480)
 
 prev_area = None
 last_box = None
 last_status = "Detecting..."
-
 lock = threading.Lock()
 
-# YOLO detection function (runs in background)
+# Threshold area to trigger "go back"
+THRESHOLD_AREA = 40000  # Based on your trigger frame
+
 def detect(frame_small):
     global last_box, last_status, prev_area
-    results = model(frame_small, imgsz=320, verbose=False)  # Resize frame for speed
-
+    results = model(frame_small, imgsz=320, verbose=False)
     for r in results:
         boxes = r.boxes
         if len(boxes) > 0:
-            # Take biggest box
             biggest_box = max(
                 boxes,
                 key=lambda b: (b.xyxy[0][2] - b.xyxy[0][0]) * (b.xyxy[0][3] - b.xyxy[0][1])
@@ -33,40 +38,50 @@ def detect(frame_small):
             x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
             area = (x2 - x1) * (y2 - y1)
 
-            # Distance comparison
-            if prev_area is not None:
-                if area > prev_area * 1.1:
-                    status = "Getting closer"
-                elif area < prev_area * 0.9:
-                    status = "Moving further"
-                else:
-                    status = "Stable"
+            if area > THRESHOLD_AREA:
+                status = "Too Close → Going Back"
+                go_back()
             else:
-                status = "Detecting..."
+                status = "Safe distance"
 
             prev_area = area
-
-            # Update shared variables safely
             with lock:
                 last_box = (x1, y1, x2, y2)
                 last_status = status
 
-# Main loop
+def go_back():
+    """Send velocity command to Pixhawk to move backward"""
+    if vehicle.mode.name != "GUIDED":
+        vehicle.mode = VehicleMode("GUIDED")
+        time.sleep(1)
+
+    send_body_velocity(-0.5, 0, 0)  # -0.5 m/s backward
+
+def send_body_velocity(vx, vy, vz):
+    """Move vehicle in body frame"""
+    msg = vehicle.message_factory.set_position_target_local_ned_encode(
+        0,  # time_boot_ms
+        0, 0,  # target system, target component
+        1,  # MAV_FRAME_LOCAL_NED
+        0b0000111111000111,  # type_mask (only velocities enabled)
+        0, 0, 0,  # x, y, z positions
+        vx, vy, vz,  # velocities in m/s
+        0, 0, 0,  # accelerations
+        0, 0)  # yaw, yaw_rate
+    vehicle.send_mavlink(msg)
+    vehicle.flush()
+
+# --- Main loop ---
 while True:
     ret, frame = cap.read()
     if not ret:
         break
 
-    # Create a smaller copy for YOLO to process faster
     frame_small = cv2.resize(frame, (320, 240))
-
-    # Run detection in a separate thread
     threading.Thread(target=detect, args=(frame_small.copy(),), daemon=True).start()
 
-    # Draw last known box + status on original high-res frame
     with lock:
         if last_box is not None:
-            # Scale box coordinates to match display resolution
             x1, y1, x2, y2 = last_box
             scale_x = frame.shape[1] / 320
             scale_y = frame.shape[0] / 240
@@ -86,3 +101,4 @@ while True:
 
 cap.release()
 cv2.destroyAllWindows()
+vehicle.close()
