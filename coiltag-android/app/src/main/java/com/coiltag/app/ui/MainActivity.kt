@@ -2,6 +2,7 @@ package com.coiltag.app.ui
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -18,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CloudUpload
@@ -236,12 +238,34 @@ fun HomeScreen(vm: AppViewModel, role: Role, snackbar: SnackbarHostState) {
     }
     var tab by rememberSaveable { mutableStateOf(tabs.first()) }
     var changingPassword by rememberSaveable { mutableStateOf(false) }
-    if (changingPassword) { ChangePasswordScreen(vm, forced = false) { changingPassword = false }; return }
     val pending by Repo.pendingCount.collectAsState()
+
+    // One rule for the top-bar arrow and the phone's back gesture:
+    // close the password screen -> leave the review screen -> return to the first tab -> (exit app).
+    val reviewing = tab == Tab.Scan && vm.step is ScanStep.Review
+    val canGoBack = changingPassword || reviewing || tab != tabs.first()
+    val goBack = {
+        when {
+            changingPassword -> changingPassword = false
+            reviewing -> vm.retake()
+            else -> tab = tabs.first()
+        }
+    }
+    BackHandler(enabled = canGoBack) { goBack() }
+
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("CoilTag · ${role.name}") },
+                navigationIcon = {
+                    if (canGoBack) IconButton(onClick = goBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                },
+                title = {
+                    Text(when {
+                        changingPassword -> "Change password"
+                        reviewing -> "Check scan"
+                        else -> "CoilTag · ${role.name}"
+                    })
+                },
                 actions = {
                     if (pending > 0) IconButton(onClick = { Repo.scheduleUpload(); vm.message = "$pending scan(s) waiting for network" }) {
                         BadgedBox(badge = { Badge { Text("$pending") } }) { Icon(Icons.Default.CloudUpload, "Pending uploads") }
@@ -265,7 +289,8 @@ fun HomeScreen(vm: AppViewModel, role: Role, snackbar: SnackbarHostState) {
         },
     ) { pad ->
         Box(Modifier.padding(pad).fillMaxSize()) {
-            when (tab) {
+            if (changingPassword) ChangePasswordScreen(vm, forced = false) { changingPassword = false }
+            else when (tab) {
                 Tab.Scan -> ScanScreen(vm)
                 Tab.Map -> MapScreen(vm)
                 Tab.Users -> UsersScreen(vm)

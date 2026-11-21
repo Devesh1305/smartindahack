@@ -2,10 +2,24 @@ package com.coiltag.app.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.coiltag.app.util.Images
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -160,13 +174,61 @@ private fun Busy(text: String, photo: File?) {
     }
 }
 
+/**
+ * Sharp preview of the tag photo (EXIF rotation applied). Tap to open full screen and pinch-zoom,
+ * so the reviewer can compare the printed tag with the extracted fields.
+ */
 @Composable
 private fun PhotoPreview(file: File) {
-    val bmp = remember(file) {
-        BitmapFactory.decodeFile(file.path, BitmapFactory.Options().apply { inSampleSize = 8 })
+    val bmp by produceState<android.graphics.Bitmap?>(null, file) {
+        value = withContext(Dispatchers.IO) { runCatching { Images.loadOriented(file, 1600) }.getOrNull() }
     }
-    bmp?.let {
-        Image(it.asImageBitmap(), null, Modifier.fillMaxWidth().height(200.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Crop)
+    var fullScreen by remember { mutableStateOf(false) }
+    Box(
+        Modifier.fillMaxWidth().height(260.dp).clip(RoundedCornerShape(12.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(enabled = bmp != null) { fullScreen = true },
+        contentAlignment = Alignment.Center,
+    ) {
+        val b = bmp
+        if (b == null) CircularProgressIndicator()
+        else {
+            Image(b.asImageBitmap(), "Tag photo", Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+            Text("Tap to zoom", Modifier.align(Alignment.BottomEnd).padding(8.dp)
+                .background(Color.Black.copy(alpha = 0.55f), RoundedCornerShape(6.dp)).padding(horizontal = 8.dp, vertical = 2.dp),
+                color = Color.White, style = MaterialTheme.typography.labelSmall)
+        }
+    }
+    if (fullScreen) ZoomablePhoto(file) { fullScreen = false }
+}
+
+@Composable
+private fun ZoomablePhoto(file: File, onClose: () -> Unit) {
+    val bmp by produceState<android.graphics.Bitmap?>(null, file) {
+        value = withContext(Dispatchers.IO) { runCatching { Images.loadOriented(file, 2400) }.getOrNull() }
+    }
+    var scale by remember { mutableFloatStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+    Dialog(onDismissRequest = onClose, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(Color.Black)) {
+            bmp?.let { b ->
+                Image(
+                    b.asImageBitmap(), "Tag photo",
+                    Modifier.fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectTransformGestures { _, pan, zoom, _ ->
+                                scale = (scale * zoom).coerceIn(1f, 6f)
+                                offset = if (scale == 1f) Offset.Zero else offset + pan
+                            }
+                        }
+                        .graphicsLayer(scaleX = scale, scaleY = scale, translationX = offset.x, translationY = offset.y),
+                    contentScale = ContentScale.Fit,
+                )
+            } ?: CircularProgressIndicator(Modifier.align(Alignment.Center))
+            IconButton(onClick = onClose, modifier = Modifier.align(Alignment.TopStart).padding(top = 32.dp, start = 8.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
+            }
+        }
     }
 }
 
