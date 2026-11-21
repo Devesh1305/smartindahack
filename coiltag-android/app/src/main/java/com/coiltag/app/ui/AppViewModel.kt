@@ -10,7 +10,9 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.coiltag.app.CoilTagApp.Companion.supabase
+import com.coiltag.app.data.NewAccount
 import com.coiltag.app.data.Profile
+import com.coiltag.app.data.loginToEmail
 import com.coiltag.app.data.Repo
 import com.coiltag.app.data.Role
 import com.coiltag.app.data.Scan
@@ -23,8 +25,6 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import java.io.File
 
 sealed interface ScanStep {
@@ -61,7 +61,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun friendly(e: Exception): String {
         val m = e.message ?: e.javaClass.simpleName
         return when {
-            "Invalid login credentials" in m -> "Wrong email or password."
+            "Invalid login credentials" in m -> "Wrong username/email or password."
+            "weak" in m.lowercase() && "password" in m.lowercase() -> "Password is too weak - use a longer one."
+            "different from the old" in m -> "New password must be different from the current one."
             "Email not confirmed" in m -> "Confirm your email first (check your inbox), then sign in."
             "Unable to resolve host" in m || "UnknownHost" in m -> "No internet connection."
             else -> m.lineSequence().first().take(200)
@@ -70,18 +72,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------------------------------------------------------------- auth
 
-    fun signIn(email: String, password: String) = launchSafely {
-        supabase.auth.signInWith(Email) { this.email = email.trim(); this.password = password }
+    /** Accepts a username (field staff) or a company email (managers). */
+    fun signIn(login: String, password: String) = launchSafely {
+        supabase.auth.signInWith(Email) { this.email = loginToEmail(login); this.password = password }
     }
 
-    fun signUp(name: String, email: String, password: String) = launchSafely {
-        supabase.auth.signUpWith(Email) {
-            this.email = email.trim(); this.password = password
-            data = buildJsonObject { put("full_name", name.trim()) }
-        }
-        if (supabase.auth.currentSessionOrNull() == null) {
-            message = "Account created. Confirm the link in your email, then sign in."
-        }
+    fun changePassword(newPassword: String, onDone: () -> Unit = {}) = launchSafely {
+        Repo.changeOwnPassword(newPassword)
+        profile = Repo.myProfile()
+        message = "Password changed"
+        onDone()
     }
 
     fun signOut() = launchSafely {
@@ -112,6 +112,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setRole(user: Profile, role: Role) = launchSafely {
         Repo.setRole(user.id, role)
         users = Repo.allProfiles()
+    }
+
+    /** Login + temporary password to hand to a person; shown once in a dialog. */
+    var issued by mutableStateOf<Pair<String, NewAccount>?>(null)
+
+    fun createAccount(fullName: String, login: String, role: Role, onDone: () -> Unit) = launchSafely {
+        val acc = Repo.createAccount(fullName, login, role)
+        issued = fullName to acc.copy(login = acc.login ?: login)
+        users = Repo.allProfiles()
+        onDone()
+    }
+
+    fun resetPassword(user: Profile) = launchSafely {
+        val acc = Repo.resetPassword(user.id)
+        issued = (user.fullName?.ifBlank { null } ?: user.login) to acc.copy(login = user.login)
+        users = Repo.allProfiles()
+    }
+
+    fun removeAccount(user: Profile) = launchSafely {
+        Repo.removeAccount(user.id)
+        users = Repo.allProfiles()
+        message = "Removed ${user.fullName?.ifBlank { null } ?: user.login}. Their past scans are kept."
     }
 
     // ---------------------------------------------------------------- scanning

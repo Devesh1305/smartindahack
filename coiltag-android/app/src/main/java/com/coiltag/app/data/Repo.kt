@@ -14,6 +14,13 @@ import com.coiltag.app.util.Images
 import com.coiltag.app.util.Locator
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.exceptions.RestException
+import io.github.jan.supabase.functions.functions
+import io.github.jan.supabase.postgrest.postgrest
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.contentType
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.storage
@@ -71,6 +78,46 @@ object Repo {
 
     suspend fun setRole(userId: String, role: Role) {
         supabase.from("profiles").update({ set("role", role.name) }) { filter { eq("id", userId) } }
+    }
+
+    // ---------------------------------------------------------------- admin account management
+    // Runs in the "admin-users" edge function: it holds the secret key and re-checks that the caller is an admin.
+
+    private suspend fun adminCall(body: kotlinx.serialization.json.JsonObject): String {
+        val res = try {
+            supabase.functions.invoke("admin-users") {
+                contentType(ContentType.Application.Json)
+                setBody(body.toString())
+            }
+        } catch (e: RestException) {
+            // Surface the function's {"error": "..."} message instead of a raw HTTP dump.
+            val msg = Regex(""""error"\s*:\s*"([^"]+)"""").find(e.message ?: "")?.groupValues?.get(1)
+            error(msg ?: e.error)
+        }
+        return res.bodyAsText()
+    }
+
+    suspend fun createAccount(fullName: String, login: String, role: Role): NewAccount {
+        val isEmail = '@' in login
+        val text = adminCall(buildJsonObject {
+            put("action", "create"); put("full_name", fullName.trim()); put("role", role.name)
+            if (isEmail) put("email", login.trim()) else put("username", login.trim().lowercase())
+        })
+        return json.decodeFromString(NewAccount.serializer(), text)
+    }
+
+    suspend fun resetPassword(userId: String): NewAccount =
+        json.decodeFromString(NewAccount.serializer(), adminCall(buildJsonObject {
+            put("action", "reset_password"); put("user_id", userId)
+        }))
+
+    suspend fun removeAccount(userId: String) {
+        adminCall(buildJsonObject { put("action", "delete"); put("user_id", userId) })
+    }
+
+    suspend fun changeOwnPassword(newPassword: String) {
+        supabase.auth.updateUser { password = newPassword }
+        supabase.postgrest.rpc("password_changed")
     }
 
     // ---------------------------------------------------------------- scans

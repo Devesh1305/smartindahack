@@ -14,6 +14,22 @@ data class Profile(
     val email: String? = null,
     @SerialName("full_name") val fullName: String? = null,
     val role: Role = Role.pending,
+    val username: String? = null,
+    @SerialName("must_change_password") val mustChangePassword: Boolean = false,
+) {
+    /** What the person types to sign in. */
+    val login: String get() = username ?: email.orEmpty()
+}
+
+/** Staff without company email sign in with a username, stored in auth as <username>@STAFF_DOMAIN. */
+const val STAFF_DOMAIN = "staff.coiltag.app"
+fun loginToEmail(login: String): String = login.trim().lowercase().let { if ('@' in it) it else "$it@$STAFF_DOMAIN" }
+
+@Serializable
+data class NewAccount(
+    @SerialName("user_id") val userId: String? = null,
+    val login: String? = null,
+    @SerialName("temp_password") val tempPassword: String,
 )
 
 /** What the phone sends. Server fills id, created_at and scanned_by (= the logged-in user). */

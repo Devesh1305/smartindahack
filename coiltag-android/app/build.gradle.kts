@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -9,11 +11,12 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.coiltag.app"
+        // Permanent once uploaded to Play: set coiltag.applicationId in gradle.properties to your company's domain first.
+        applicationId = property("coiltag.applicationId") as String
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.1.2"
+        versionCode = 4
+        versionName = "0.2.0"
         buildConfigField("String", "SUPABASE_URL", "\"${property("coiltag.supabaseUrl")}\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${property("coiltag.supabaseKey")}\"")
         ndk {
@@ -23,14 +26,25 @@ android {
         }
     }
 
+    // Release key comes from keystore.properties (never committed). Without it, release builds
+    // fall back to the debug key: fine for sideloading tests, rejected by Play.
+    val keystoreProps = rootProject.file("keystore.properties").takeIf { it.exists() }
+        ?.let { f -> Properties().apply { f.inputStream().use(::load) } }
+    signingConfigs {
+        if (keystoreProps != null) create("release") {
+            storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+            storePassword = keystoreProps.getProperty("storePassword")
+            keyAlias = keystoreProps.getProperty("keyAlias")
+            keyPassword = keystoreProps.getProperty("keyPassword")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // Signed with the debug key so the APK installs directly for testing.
-            // Replace with a real keystore before any Play Store release.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     buildFeatures {
@@ -75,6 +89,7 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
+    implementation("io.github.jan-tennert.supabase:functions-kt")
     implementation("io.ktor:ktor-client-okhttp:3.6.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -111,7 +112,8 @@ fun AppRoot(vm: AppViewModel) {
                             TextButton(onClick = { vm.signOut() }) { Text("Sign out") }
                         }
                     }
-                    p.role == Role.pending -> PendingScreen(vm, p.email)
+                    p.mustChangePassword -> ChangePasswordScreen(vm, forced = true)
+                    p.role == Role.pending -> PendingScreen(vm, p.login)
                     else -> HomeScreen(vm, p.role, snackbar)
                 }
             }
@@ -146,9 +148,7 @@ private fun Centered(content: @Composable () -> Unit) =
 
 @Composable
 fun AuthScreen(vm: AppViewModel) {
-    var signUp by rememberSaveable { mutableStateOf(false) }
-    var name by rememberSaveable { mutableStateOf("") }
-    var email by rememberSaveable { mutableStateOf("") }
+    var login by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     Column(
         Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp),
@@ -157,37 +157,66 @@ fun AuthScreen(vm: AppViewModel) {
         Text("CoilTag", style = MaterialTheme.typography.displaySmall, color = MaterialTheme.colorScheme.primary)
         Text("Steel coil tag scanner", style = MaterialTheme.typography.bodyLarge)
         Spacer(Modifier.height(32.dp))
-        if (signUp) OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text("Full name") }, singleLine = true)
-        OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), label = { Text("Work email") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
-        OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Password (min 6)") },
+        OutlinedTextField(login, { login = it }, Modifier.fillMaxWidth(), label = { Text("Username or email") },
+            singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
+        OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), label = { Text("Password") },
             singleLine = true, visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
         Spacer(Modifier.height(16.dp))
         Button(
-            onClick = { if (signUp) vm.signUp(name, email, password) else vm.signIn(email, password) },
-            enabled = !vm.busy && email.isNotBlank() && password.length >= 6 && (!signUp || name.isNotBlank()),
+            onClick = { vm.signIn(login, password) },
+            enabled = !vm.busy && login.isNotBlank() && password.isNotEmpty(),
             modifier = Modifier.fillMaxWidth().height(52.dp),
-        ) { Text(if (signUp) "Create account" else "Sign in") }
-        TextButton(onClick = { signUp = !signUp }, modifier = Modifier.fillMaxWidth()) {
-            Text(if (signUp) "Have an account? Sign in" else "New here? Request access")
-        }
-        if (signUp) Text(
-            "New accounts can't see or add anything until an admin approves them.",
+        ) { Text("Sign in") }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            "Accounts are created by your CoilTag admin. Ask them for your username and temporary password.",
             style = MaterialTheme.typography.bodySmall, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
         )
     }
 }
 
+const val MIN_PASSWORD = 10
+
 @Composable
-fun PendingScreen(vm: AppViewModel, email: String?) {
+fun ChangePasswordScreen(vm: AppViewModel, forced: Boolean, onClose: () -> Unit = {}) {
+    var pw by rememberSaveable { mutableStateOf("") }
+    var pw2 by rememberSaveable { mutableStateOf("") }
+    val tooShort = pw.isNotEmpty() && pw.length < MIN_PASSWORD
+    val mismatch = pw2.isNotEmpty() && pw != pw2
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.Center) {
+        Text(if (forced) "Set your own password" else "Change password", style = MaterialTheme.typography.headlineSmall)
+        if (forced) Text("You signed in with a temporary password from your admin. Choose a new one only you know.",
+            style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(pw, { pw = it }, Modifier.fillMaxWidth(), label = { Text("New password") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(), isError = tooShort,
+            supportingText = { Text("At least $MIN_PASSWORD characters") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+        OutlinedTextField(pw2, { pw2 = it }, Modifier.fillMaxWidth(), label = { Text("Repeat new password") }, singleLine = true,
+            visualTransformation = PasswordVisualTransformation(), isError = mismatch,
+            supportingText = { if (mismatch) Text("Passwords don't match") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = { vm.changePassword(pw, onClose) },
+            enabled = !vm.busy && pw.length >= MIN_PASSWORD && pw == pw2,
+            modifier = Modifier.fillMaxWidth().height(52.dp),
+        ) { Text("Save password") }
+        if (forced) TextButton(onClick = { vm.signOut() }, modifier = Modifier.fillMaxWidth()) { Text("Sign out") }
+        else TextButton(onClick = onClose, modifier = Modifier.fillMaxWidth()) { Text("Cancel") }
+    }
+}
+
+@Composable
+fun PendingScreen(vm: AppViewModel, login: String?) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text("Waiting for approval", style = MaterialTheme.typography.headlineSmall)
+        Text("No access yet", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(8.dp))
-        Text("${email ?: "Your account"} is signed in, but an admin has to grant you access before you can scan or see the map.",
+        Text("${login ?: "Your account"} is signed in, but it has no role. Ask your CoilTag admin to give you access.",
             textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         Button(onClick = { vm.loadProfile() }, enabled = !vm.busy) { Text("Check again") }
@@ -206,6 +235,8 @@ fun HomeScreen(vm: AppViewModel, role: Role, snackbar: SnackbarHostState) {
         if (role == Role.admin) add(Tab.Users)
     }
     var tab by rememberSaveable { mutableStateOf(tabs.first()) }
+    var changingPassword by rememberSaveable { mutableStateOf(false) }
+    if (changingPassword) { ChangePasswordScreen(vm, forced = false) { changingPassword = false }; return }
     val pending by Repo.pendingCount.collectAsState()
     Scaffold(
         topBar = {
@@ -215,6 +246,7 @@ fun HomeScreen(vm: AppViewModel, role: Role, snackbar: SnackbarHostState) {
                     if (pending > 0) IconButton(onClick = { Repo.scheduleUpload(); vm.message = "$pending scan(s) waiting for network" }) {
                         BadgedBox(badge = { Badge { Text("$pending") } }) { Icon(Icons.Default.CloudUpload, "Pending uploads") }
                     }
+                    IconButton(onClick = { changingPassword = true }) { Icon(Icons.Default.Key, "Change password") }
                     IconButton(onClick = { vm.signOut() }) { Icon(Icons.AutoMirrored.Filled.Logout, "Sign out") }
                 },
             )
