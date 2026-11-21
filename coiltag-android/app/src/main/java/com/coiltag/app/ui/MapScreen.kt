@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -75,6 +76,7 @@ fun MapScreen(vm: AppViewModel) {
         MapView(ctx).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
+            zoomController.setVisibility(org.osmdroid.views.CustomZoomButtonsController.Visibility.NEVER)
             controller.setZoom(5.0)
             controller.setCenter(GeoPoint(21.0, 78.0))
         }
@@ -104,7 +106,8 @@ fun MapScreen(vm: AppViewModel) {
 
         AndroidView(
             factory = { mapView },
-            modifier = Modifier.fillMaxWidth().weight(1f),
+            // MapView draws outside its bounds unless clipped, covering the list and header.
+            modifier = Modifier.fillMaxWidth().weight(1f).clipToBounds(),
             update = { map ->
                 map.overlays.clear()
                 val points = mutableListOf<GeoPoint>()
@@ -129,10 +132,11 @@ fun MapScreen(vm: AppViewModel) {
                 }
                 if (!fitted && points.isNotEmpty()) {
                     fitted = true
-                    map.post {
+                    val fit = {
                         if (points.size == 1) { map.controller.setZoom(17.0); map.controller.setCenter(points[0]) }
                         else map.zoomToBoundingBox(BoundingBox.fromGeoPointsSafe(points).increaseByScale(1.3f), false)
                     }
+                    if (map.width > 0) fit() else map.addOnFirstLayoutListener { _, _, _, _, _ -> fit() }
                 }
                 map.invalidate()
             },
