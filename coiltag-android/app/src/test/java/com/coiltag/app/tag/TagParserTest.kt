@@ -77,4 +77,30 @@ class TagParserTest {
         assertEquals("AB123", r.batchId)
         assertTrue(r.warnings.any { "does not match" in it })
     }
+
+    @Test fun printedZerosReadAsLettersAreNotAMismatch() {
+        // Real failure from a phone: QR "9103KC000H", OCR of the print "9103KCOOOH".
+        val r = TagParser.parse(
+            listOf(TextBox("Batch ID", 10f, 10f, 80f, 30f), TextBox("9103KCOOOH", 10f, 40f, 120f, 60f)),
+            listOf("9103KC000H"),
+        )
+        assertEquals("9103KC000H", r.batchId)
+        assertTrue(r.warnings.toString(), r.warnings.none { "does not match" in it })
+    }
+
+    @Test fun realMismatchStillWarns() {
+        val r = TagParser.parse(
+            listOf(TextBox("Batch ID", 10f, 10f, 80f, 30f), TextBox("9103KC000J", 10f, 40f, 120f, 60f)),
+            listOf("9103KC000H"),
+        )
+        assertTrue(r.warnings.any { "does not match" in it })
+    }
+
+    @Test fun underscoreSpacingAndNumericLookalikesAreCleaned() {
+        assertEquals("DOM_OEM", TagParser.clean("pack_type", "DOM_ OEM"))
+        assertEquals("IS 277_2018 GP250", TagParser.clean("spec", "IS 277_ 2018 GP250"))
+        assertEquals("20.725 MT", TagParser.clean("net_weight", "2O.725MT"))
+        assertEquals("0.410 x 1220 x 5278", TagParser.clean("size", "O.41O X l220 X 5278"))
+        assertEquals("11/10/2026 11:36:54 AM", TagParser.clean("date", "11/1O/2026 11:36:54 AM"))
+    }
 }

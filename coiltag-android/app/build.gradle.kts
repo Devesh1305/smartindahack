@@ -15,8 +15,8 @@ android {
         applicationId = property("coiltag.applicationId") as String
         minSdk = 26
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.2.0"
+        versionCode = 5
+        versionName = "0.2.1"
         buildConfigField("String", "SUPABASE_URL", "\"${property("coiltag.supabaseUrl")}\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${property("coiltag.supabaseKey")}\"")
         ndk {

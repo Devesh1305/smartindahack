@@ -91,8 +91,36 @@ object TagParser {
         return out
     }
 
+    /**
+     * Characters OCR cannot tell apart in label fonts (a printed 0 and O are identical).
+     * Used only for comparing, never to rewrite text that might genuinely contain letters.
+     */
+    private val LOOKALIKE = mapOf('O' to '0', 'Q' to '0', 'D' to '0', 'I' to '1', 'L' to '1', '|' to '1',
+        'S' to '5', 'B' to '8', 'Z' to '2', 'G' to '6')
+
+    fun lookalikeKey(s: String): String =
+        s.uppercase().filter { it.isLetterOrDigit() || it == '|' }.map { LOOKALIKE[it] ?: it }.joinToString("")
+
+    /** In fields that only ever hold numbers, OCR letters that look like digits are digits. */
+    private fun digitsOnly(v: String): String {
+        val chars = v.toCharArray()
+        for (i in chars.indices) {
+            val c = chars[i]
+            if (c !in "OoIl|") continue
+            val prev = chars.getOrNull(i - 1)
+            val next = chars.getOrNull(i + 1)
+            // only when touching a digit or decimal point, so "MT" / "AM" units are left alone
+            if ((prev != null && (prev.isDigit() || prev == '.' || prev == '/' || prev == ':')) ||
+                (next != null && (next.isDigit() || next == '.' || next == '/' || next == ':'))
+            ) chars[i] = if (c == 'O' || c == 'o') '0' else '1'
+        }
+        return String(chars)
+    }
+
     fun clean(key: String, raw: String): String {
-        var v = raw.trim()
+        // OCR adds a space after underscores: "DOM_ OEM" -> "DOM_OEM"
+        var v = raw.trim().replace(Regex("""\s*_\s*"""), "_")
+        if (key in setOf("size", "net_weight", "gross_weight", "date")) v = digitsOnly(v)
         when (key) {
             "size" -> v = v.replace(Regex("""\s*[xX×]\s*"""), " x ").replace('（', '(').replace('）', ')')
             "net_weight", "gross_weight" -> Regex("""\d+(?:\.\d+)?""").find(v.replace(',', '.'))?.let {
@@ -147,7 +175,8 @@ object TagParser {
                 null to null
             }
         }
-        if (batch != null && ocrBatch != null && norm(ocrBatch) != norm(batch)) {
+        // Compare ignoring look-alikes: OCR reads a printed "000" as "OOO", but the QR is exact.
+        if (batch != null && ocrBatch != null && lookalikeKey(ocrBatch) != lookalikeKey(batch)) {
             warnings += "Printed batch '$ocrBatch' does not match QR '$batch'."
         }
         fields["batch_id"] = batch ?: ""
