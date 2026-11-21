@@ -86,6 +86,13 @@ fun ScanScreen(vm: AppViewModel) {
         val f = captureFile?.let(::File)
         if (ok && f != null && f.length() > 0) vm.onPhotoTaken(f) else f?.delete()
     }
+    val gallery = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) {
+            val f = vm.newCaptureFile()
+            ctx.contentResolver.openInputStream(uri)?.use { input -> f.outputStream().use { input.copyTo(it) } }
+            if (f.length() > 0) vm.onPhotoTaken(f) else f.delete()
+        }
+    }
     fun launchCamera() {
         val f = vm.newCaptureFile()
         captureFile = f.path
@@ -93,7 +100,7 @@ fun ScanScreen(vm: AppViewModel) {
     }
 
     when (val step = vm.step) {
-        ScanStep.Idle -> IdleView(vm, hasLocation, onShoot = ::launchCamera,
+        ScanStep.Idle -> IdleView(vm, hasLocation, onShoot = ::launchCamera, onGallery = { gallery.launch("image/*") },
             onGrant = { permLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)) })
         is ScanStep.Reading -> Busy("Reading QR codes and text…", step.photo)
         ScanStep.Saving -> Busy("Geotagging and saving…", null)
@@ -115,7 +122,7 @@ private fun GpsChip(vm: AppViewModel) {
 }
 
 @Composable
-private fun IdleView(vm: AppViewModel, hasLocation: Boolean, onShoot: () -> Unit, onGrant: () -> Unit) {
+private fun IdleView(vm: AppViewModel, hasLocation: Boolean, onShoot: () -> Unit, onGallery: () -> Unit, onGrant: () -> Unit) {
     Column(
         Modifier.fillMaxSize().padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
@@ -133,9 +140,10 @@ private fun IdleView(vm: AppViewModel, hasLocation: Boolean, onShoot: () -> Unit
             Spacer(Modifier.size(12.dp))
             Text("Photograph coil tag", style = MaterialTheme.typography.titleLarge)
         }
-        Spacer(Modifier.height(16.dp))
+        TextButton(onClick = onGallery, enabled = hasLocation) { Text("Use a photo from gallery") }
+        Spacer(Modifier.height(8.dp))
         Text(
-            "Fill the frame with the whole sticker, including every QR code. Avoid glare from the coil.",
+            "Fill the frame with the whole sticker, including every QR code. Avoid glare from the coil. Gallery photos are tagged with your current location, so scan them where the coil is.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }

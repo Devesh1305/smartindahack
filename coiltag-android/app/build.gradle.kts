@@ -16,11 +16,18 @@ android {
         versionName = "0.1.0"
         buildConfigField("String", "SUPABASE_URL", "\"${property("coiltag.supabaseUrl")}\"")
         buildConfigField("String", "SUPABASE_KEY", "\"${property("coiltag.supabaseKey")}\"")
+        ndk {
+            // Real phones are ARM. Pass -Pemulator to also include x86_64 for emulator testing.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            if (project.hasProperty("emulator")) abiFilters += "x86_64"
+        }
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             // Signed with the debug key so the APK installs directly for testing.
             // Replace with a real keystore before any Play Store release.
             signingConfig = signingConfigs.getByName("debug")
