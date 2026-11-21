@@ -16,3 +16,7 @@
 -dontwarn io.ktor.**
 -dontwarn org.osmdroid.**
 -dontwarn java.lang.management.**
+
+# WorkManager's Room database (WorkDatabase_Impl) is created by reflection at start-up.
+# Without this R8 strips its constructor and the app crashes before the first screen.
+-keep class * extends androidx.room.RoomDatabase { <init>(...); }

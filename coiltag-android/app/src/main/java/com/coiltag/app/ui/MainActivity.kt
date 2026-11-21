@@ -70,12 +70,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        val crashFile = com.coiltag.app.CoilTagApp.crashFile(this)
+        val lastCrash = crashFile.takeIf { it.exists() }?.readText()
         setContent {
             val dark = isSystemInDarkTheme()
             MaterialTheme(
                 colorScheme = if (dark) darkColorScheme(primary = Color(0xFFFF6B7D), secondary = Color(0xFFFF6B7D))
                 else lightColorScheme(primary = Brand, secondary = Brand)
-            ) { AppRoot(vm) }
+            ) {
+                var crash by remember { mutableStateOf(lastCrash) }
+                val c = crash
+                // Checked before touching the view model, so a crash in app start-up can still be reported.
+                if (c != null) CrashReport(c) { crashFile.delete(); crash = null }
+                else AppRoot(vm)
+            }
         }
     }
 }
@@ -110,6 +118,25 @@ fun AppRoot(vm: AppViewModel) {
             is SessionStatus.NotAuthenticated -> AuthScreen(vm)
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp))
+    }
+}
+
+@Composable
+fun CrashReport(trace: String, onDismiss: () -> Unit) {
+    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+    Column(Modifier.fillMaxSize().padding(16.dp).padding(top = 32.dp)) {
+        Text("CoilTag crashed last time", style = MaterialTheme.typography.headlineSmall)
+        Text("Copy this and send it to the developer.", style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(8.dp))
+        androidx.compose.foundation.layout.Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(trace)) }) { Text("Copy error") }
+            OutlinedButton(onClick = onDismiss) { Text("Continue") }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            trace, Modifier.weight(1f).verticalScroll(rememberScrollState()),
+            style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace),
+        )
     }
 }
 
