@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CoilTag Scanner</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="bar">
+  <strong>CoilTag</strong>
+  <span id="gps" class="pill warn">GPS: waiting…</span>
+  <a href="/map" class="link">Map →</a>
+</header>
+
+<main class="wrap">
+  <section id="step-capture">
+    <label class="big-btn">
+      <input id="file" type="file" accept="image/*" capture="environment" hidden>
+      📷 Photograph coil tag
+    </label>
+    <p class="hint">Fill the frame with the whole sticker, including every QR code. Avoid glare from the coil.</p>
+  </section>
+
+  <section id="step-busy" hidden>
+    <img id="preview" class="preview" alt="">
+    <p class="hint"><span class="spinner"></span> Reading QR codes and text…</p>
+  </section>
+
+  <section id="step-review" hidden>
+    <img id="preview2" class="preview" alt="">
+    <div id="warnings"></div>
+    <form id="form">
+      <label>Batch ID <span id="batch-src" class="tag"></span>
+        <input name="batch_id" required autocomplete="off"></label>
+      <label>Manufacturer <input name="manufacturer"></label>
+      <label>Product <input name="product"></label>
+      <div id="fields"></div>
+      <details><summary>QR codes found (<span id="qr-count">0</span>)</summary><ul id="qrs"></ul></details>
+      <details><summary>Raw OCR text</summary><pre id="ocr"></pre></details>
+      <p id="loc" class="loc"></p>
+      <div class="row">
+        <button type="button" id="retake" class="secondary">Retake</button>
+        <button type="submit" id="save">Save geotagged scan</button>
+      </div>
+    </form>
+  </section>
+  <div id="toast" class="toast" hidden></div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const LABELS = { size: "Size", heat_no: "Heat No", grade: "Grade", net_weight: "Net weight",
+  gross_weight: "Gross weight", date: "Mfg date", pack_type: "Pack type", spec: "Specification",
+  spec_2: "Specification 2", customer: "Customer / Ship-to" };
+const MAX_ACCURACY_M = 50;
+
+let pos = null;          // latest GPS fix
+let shotPos = null;      // fix frozen at the moment the photo was taken
+let reading = null;
+
+// --- GPS: start immediately so a fix is warm by the time the photo is taken
+function gpsStatus(text, cls) { const el = $("#gps"); el.textContent = text; el.className = "pill " + cls; }
+if (!("geolocation" in navigator) || !window.isSecureContext) {
+  gpsStatus("GPS unavailable (needs HTTPS)", "bad");
+} else {
+  navigator.geolocation.watchPosition(p => {
+    pos = { lat: p.coords.latitude, lon: p.coords.longitude, accuracy: p.coords.accuracy, at: new Date(p.timestamp) };
+    gpsStatus(`GPS ±${Math.round(pos.accuracy)} m`, pos.accuracy <= MAX_ACCURACY_M ? "ok" : "warn");
+  }, e => gpsStatus("GPS: " + e.message, "bad"), { enableHighAccuracy: true, maximumAge: 5000, timeout: 30000 });
+}
+
+function show(step) { for (const s of ["capture", "busy", "review"]) $("#step-" + s).hidden = s !== step; }
+function toast(msg, bad) { const t = $("#toast"); t.textContent = msg; t.className = "toast" + (bad ? " bad" : ""); t.hidden = false; setTimeout(() => t.hidden = true, 3500); }
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+$("#file").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  shotPos = pos && { ...pos, at: new Date() };
+  const url = URL.createObjectURL(file);
+  $("#preview").src = $("#preview2").src = url;
+  show("busy");
+  const fd = new FormData(); fd.append("image", file);
+  try {
+    const r = await fetch("/api/read", { method: "POST", body: fd });
+    if (!r.ok) throw new Error(await r.text());
+    reading = await r.json();
+    renderReview();
+  } catch (err) { toast("Could not read tag: " + err.message, true); show("capture"); }
+  e.target.value = "";
+});
+
+function renderReview() {
+  const f = $("#form");
+  f.batch_id.value = reading.batch_id || "";
+  f.manufacturer.value = reading.manufacturer || "";
+  f.product.value = reading.product || "";
+  const src = { qr: "✓ from QR", qci_url: "✓ from QCI QR", ocr: "⚠ OCR only" }[reading.batch_id_source] || "⚠ not found";
+  $("#batch-src").textContent = src;
+  $("#batch-src").className = "tag " + (src.startsWith("✓") ? "ok" : "warn");
+  $("#fields").innerHTML = Object.entries(reading.fields).filter(([k]) => k !== "batch_id").map(([k, v]) =>
+    `<label>${esc(LABELS[k] || k)} <input data-field="${esc(k)}" value="${esc(v)}"></label>`).join("");
+  $("#warnings").innerHTML = reading.warnings.map(w => `<p class="warning">⚠ ${esc(w)}</p>`).join("");
+  $("#qr-count").textContent = reading.qr_codes.length;
+  $("#qrs").innerHTML = reading.qr_codes.map(q => `<li>${q.startsWith("http") ? `<a href="${esc(q)}" target="_blank" rel="noopener">${esc(q)}</a>` : esc(q)}</li>`).join("");
+  $("#ocr").textContent = reading.ocr_lines.join("\n");
+  renderLoc();
+  show("review");
+}
+
+function renderLoc() {
+  const p = shotPos || pos;
+  $("#loc").innerHTML = p
+    ? `📍 ${p.lat.toFixed(6)}, ${p.lon.toFixed(6)} (±${Math.round(p.accuracy)} m)` +
+      (p.accuracy > MAX_ACCURACY_M ? ` <span class="tag warn">weak fix — move into open sky</span>` : "")
+    : `<span class="tag warn">No GPS fix yet — allow location access</span>`;
+}
+
+$("#retake").onclick = () => show("capture");
+
+$("#form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const p = shotPos || pos;
+  if (!p) { toast("Waiting for GPS fix", true); return; }
+  if (p.accuracy > MAX_ACCURACY_M && !confirm(`GPS accuracy is ±${Math.round(p.accuracy)} m. Save anyway?`)) return;
+  const f = e.target, fields = {};
+  f.querySelectorAll("[data-field]").forEach(i => fields[i.dataset.field] = i.value.trim());
+  $("#save").disabled = true;
+  try {
+    const r = await fetch("/api/scans", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      upload_id: reading.upload_id, batch_id: f.batch_id.value.trim(), manufacturer: f.manufacturer.value.trim(),
+      product: f.product.value.trim(), fields, qr_codes: reading.qr_codes,
+      lat: p.lat, lon: p.lon, accuracy: p.accuracy, captured_at: p.at.toISOString() }) });
+    if (!r.ok) throw new Error(await r.text());
+    toast(`Saved ${f.batch_id.value} at ${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`);
+    show("capture");
+  } catch (err) { toast("Save failed: " + err.message, true); }
+  finally { $("#save").disabled = false; }
+});
+
+setInterval(() => { if (!$("#step-review").hidden && !shotPos) renderLoc(); }, 2000);
+</script>
+</body>
+</html>

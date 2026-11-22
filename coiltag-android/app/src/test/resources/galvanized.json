@@ -1,0 +1,161 @@
+{
+"qr": [
+"9103KC000H"
+],
+"boxes": [
+{
+"text": "AM/NS",
+"left": 520.0,
+"top": 782.0,
+"right": 697.0,
+"bottom": 831.0
+},
+{
+"text": "IN",
+"left": 202.0,
+"top": 802.0,
+"right": 244.0,
+"bottom": 834.0
+},
+{
+"text": "INDIA",
+"left": 518.0,
+"top": 826.0,
+"right": 639.0,
+"bottom": 865.0
+},
+{
+"text": "INDIA",
+"left": 189.0,
+"top": 834.0,
+"right": 285.0,
+"bottom": 869.0
+},
+{
+"text": "GALVANIZEDPRODUCT",
+"left": 404.0,
+"top": 882.0,
+"right": 780.0,
+"bottom": 922.0
+},
+{
+"text": "BatchID",
+"left": 203.0,
+"top": 948.0,
+"right": 285.0,
+"bottom": 972.0
+},
+{
+"text": "Net wt.",
+"left": 569.0,
+"top": 950.0,
+"right": 634.0,
+"bottom": 971.0
+},
+{
+"text": "9103KC000H",
+"left": 212.0,
+"top": 971.0,
+"right": 420.0,
+"bottom": 1005.0
+},
+{
+"text": "20.725",
+"left": 572.0,
+"top": 972.0,
+"right": 651.0,
+"bottom": 998.0
+},
+{
+"text": "Gross Wt.",
+"left": 575.0,
+"top": 1003.0,
+"right": 663.0,
+"bottom": 1028.0
+},
+{
+"text": "Size(T-mmxW-mmxL-mtr)",
+"left": 221.0,
+"top": 1009.0,
+"right": 449.0,
+"bottom": 1035.0
+},
+{
+"text": "20.825",
+"left": 576.0,
+"top": 1027.0,
+"right": 655.0,
+"bottom": 1053.0
+},
+{
+"text": "0.410X1220X5278",
+"left": 214.0,
+"top": 1032.0,
+"right": 428.0,
+"bottom": 1059.0
+},
+{
+"text": "PackType",
+"left": 582.0,
+"top": 1061.0,
+"right": 672.0,
+"bottom": 1081.0
+},
+{
+"text": "Date",
+"left": 223.0,
+"top": 1068.0,
+"right": 265.0,
+"bottom": 1086.0
+},
+{
+"text": "DOM_OEM",
+"left": 579.0,
+"top": 1081.0,
+"right": 700.0,
+"bottom": 1107.0
+},
+{
+"text": "11/10/202611:36:54AM",
+"left": 224.0,
+"top": 1085.0,
+"right": 472.0,
+"bottom": 1111.0
+},
+{
+"text": "Specification",
+"left": 231.0,
+"top": 1115.0,
+"right": 341.0,
+"bottom": 1138.0
+},
+{
+"text": "IS_277_2018_GP250",
+"left": 231.0,
+"top": 1135.0,
+"right": 442.0,
+"bottom": 1162.0
+},
+{
+"text": "Customer/Ship ToParty",
+"left": 250.0,
+"top": 1176.0,
+"right": 418.0,
+"bottom": 1196.0
+},
+{
+"text": "AM/NSIPVTLTD-PRECOATEDFA",
+"left": 252.0,
+"top": 1194.0,
+"right": 516.0,
+"bottom": 1215.0
+},
+{
+"text": "AM/NSIPVTLTD.-PUNE",
+"left": 257.0,
+"top": 1216.0,
+"right": 441.0,
+"bottom": 1233.0
+}
+]
+}

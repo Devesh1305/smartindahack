@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CoilTag Map</title>
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/static/style.css">
+<style>
+  body { display: flex; flex-direction: column; height: 100vh; margin: 0; }
+  .layout { flex: 1; display: flex; min-height: 0; }
+  #map { flex: 1; }
+  aside { width: 340px; overflow-y: auto; border-left: 1px solid var(--line); background: var(--bg); }
+  aside .item { padding: 10px 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+  aside .item:hover { background: var(--card); }
+  .item b { display: block; }
+  .item small { color: var(--muted); }
+  .filters { padding: 10px 14px; display: flex; gap: 8px; border-bottom: 1px solid var(--line); }
+  .filters input { flex: 1; margin: 0; }
+  .popup img { width: 220px; height: 130px; object-fit: cover; border-radius: 6px; display: block; margin-top: 6px; }
+  @media (max-width: 700px) { .layout { flex-direction: column; } aside { width: auto; height: 40vh; border-left: 0; border-top: 1px solid var(--line); } }
+</style>
+</head>
+<body>
+<header class="bar">
+  <strong>CoilTag · Map</strong>
+  <span id="count" class="pill ok">0 scans</span>
+  <a href="/api/scans.csv" class="link">CSV</a>
+  <a href="/" class="link">Scan →</a>
+</header>
+<div class="layout">
+  <div id="map"></div>
+  <aside>
+    <div class="filters"><input id="q" placeholder="Filter by batch / manufacturer"></div>
+    <div id="list"></div>
+  </aside>
+</div>
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script>
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const map = L.map("map").setView([21.1, 72.7], 5);
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+const layer = L.layerGroup().addTo(map);
+let scans = [];
+
+function popup(s) {
+  const f = s.fields;
+  return `<div class="popup"><b>${esc(s.manufacturer || "Unknown manufacturer")}</b><br>
+    Batch <b>${esc(s.batch_id)}</b> · ${esc(s.product || "")}<br>
+    ${f.size ? "Size " + esc(f.size) + "<br>" : ""}${f.net_weight ? "Net " + esc(f.net_weight) + "<br>" : ""}
+    <small>${new Date(s.captured_at).toLocaleString()} · ±${Math.round(s.accuracy_m || 0)} m</small>
+    <a href="${s.image_url}" target="_blank"><img src="${s.image_url}" alt=""></a></div>`;
+}
+
+function render() {
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  const rows = scans.filter(s => !q || (s.batch_id + " " + s.manufacturer).toLowerCase().includes(q));
+  layer.clearLayers();
+  const byBatch = {};
+  for (const s of rows) (byBatch[s.batch_id] ||= []).push(s);
+  const bounds = [];
+  for (const [batch, list] of Object.entries(byBatch)) {
+    // list is newest-first: solid marker = current position, faded = earlier sightings, line = movement
+    list.forEach((s, i) => {
+      const m = L.circleMarker([s.lat, s.lon], { radius: i ? 6 : 9, weight: 2, color: "#c8102e", fillOpacity: i ? 0.25 : 0.85 })
+        .bindPopup(popup(s), { autoPanPaddingTopLeft: [20, 80] }).bindTooltip(`${batch} · ${s.manufacturer || ""}`);
+      m.addTo(layer); s._marker = m; bounds.push([s.lat, s.lon]);
+    });
+    if (list.length > 1) L.polyline(list.map(s => [s.lat, s.lon]).reverse(), { color: "#c8102e", dashArray: "4 6", weight: 2 }).addTo(layer);
+  }
+  if (bounds.length) map.fitBounds(bounds, { padding: [40, 40], maxZoom: 17 });
+  document.getElementById("count").textContent = `${rows.length} scans · ${Object.keys(byBatch).length} coils`;
+  document.getElementById("list").innerHTML = rows.map((s, i) =>
+    `<div class="item" data-i="${scans.indexOf(s)}"><b>${esc(s.batch_id)}</b>${esc(s.manufacturer || "")} · ${esc(s.product || "")}<br>
+     <small>${new Date(s.captured_at).toLocaleString()} · ${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}</small></div>`).join("")
+    || `<p class="hint" style="padding:14px">No scans yet.</p>`;
+}
+
+document.getElementById("list").addEventListener("click", e => {
+  const it = e.target.closest(".item"); if (!it) return;
+  const s = scans[it.dataset.i]; map.setView([s.lat, s.lon], 18); s._marker.openPopup();
+});
+document.getElementById("q").addEventListener("input", render);
+
+async function load() { scans = await (await fetch("/api/scans")).json(); render(); }
+load(); setInterval(load, 30000);
+</script>
+</body>
+</html>

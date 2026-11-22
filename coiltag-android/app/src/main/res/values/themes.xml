@@ -1,0 +1,5 @@
+<resources>
+    <style name="Theme.CoilTag" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#C8102E</item>
+    </style>
+</resources>
