@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CoilTag – Project Abstract and Proposal</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=Public+Sans:wght@400;600;700&display=swap">
+<style>
+  @page { size: A4; margin: 20mm 18mm 22mm; }
+  :root { --ink:#14202B; --muted:#4B5866; --accent:#B4461A; --line:#D9D3C8; --card:#F4F1EC; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Public Sans', Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; margin: 0; }
+  h1, h2, h3 { font-family: 'Oswald', 'Arial Narrow', Arial, sans-serif; font-weight: 600; letter-spacing: .3px; margin: 0; }
+  h1 { font-size: 34pt; text-transform: uppercase; line-height: 1.05; }
+  h2 { font-size: 16pt; text-transform: uppercase; margin: 22px 0 8px; padding-top: 10px; border-top: 2px solid var(--ink); break-after: avoid; }
+  h3 { font-size: 12pt; margin: 14px 0 4px; break-after: avoid; }
+  p { margin: 0 0 8px; }
+  ul { margin: 4px 0 10px; padding-left: 18px; } li { margin: 2px 0; }
+  .eyebrow { font-size: 9pt; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); }
+  .muted { color: var(--muted); }
+  .cover { padding: 18mm 0 10mm; border-bottom: 6px solid var(--accent); margin-bottom: 8mm; }
+  .cover .lead { font-size: 13pt; color: var(--muted); margin-top: 10px; max-width: 150mm; }
+  .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; margin-top: 14px; font-size: 10pt; }
+  .meta b { display: inline-block; min-width: 34mm; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 10pt; break-inside: avoid; }
+  th { text-align: left; background: var(--ink); color: #F4F1EC; padding: 6px 8px; font-weight: 600; }
+  td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td.num, th.num { text-align: right; white-space: nowrap; }
+  tr.total td { font-weight: 700; border-top: 2px solid var(--ink); border-bottom: none; }
+  .box { background: var(--card); border-left: 4px solid var(--accent); padding: 10px 14px; margin: 8px 0 12px; break-inside: avoid; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .sign { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-top: 26px; break-inside: avoid; }
+  .sign div { border-top: 1px solid var(--ink); padding-top: 6px; font-size: 9.5pt; }
+  .pb { break-before: page; }
+  .ph { background: #FFF1C2; padding: 0 3px; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <p class="eyebrow">Project abstract and commercial proposal</p>
+  <h1>CoilTag</h1>
+  <p class="lead">Steel coil tag scanning with GPS geotagging: one photo of a coil tag becomes a verified record, pinned on a live map that only authorised staff can see.</p>
+  <div class="meta">
+    <span><b>Prepared for</b> <span class="ph">[Client company]</span></span>
+    <span><b>Proposal ref.</b> CT-2026-001</span>
+    <span><b>Prepared by</b> <span class="ph">[Your name]</span></span>
+    <span><b>Date</b> 22 November 2026</span>
+    <span><b>Contact</b> <span class="ph">[Phone] · [Email]</span></span>
+    <span><b>Valid until</b> 22 December 2026</span>
+  </div>
+</div>
+
+<h2>1. Abstract</h2>
+<p>Steel coils are identified by a printed tag carrying the batch ID, size, weight, grade, heat number and specification. In most yards these tags are read by eye and copied by hand into registers or spreadsheets, and a coil’s location is rarely recorded. The result is transcription errors, time lost searching the yard during dispatch, and no evidence when a coil’s identity, condition or location is disputed.</p>
+<p><b>CoilTag</b> is an Android app with a secure cloud backend. A yard worker photographs a coil tag; the app decodes every QR code on it and reads the printed text on the phone itself, so it works without mobile signal. It fills in a structured record, cross-checks the printed batch ID against the QR code, and stamps the record and photo with the phone’s GPS position and time. The worker confirms the fields and saves. Records upload automatically when signal is available and appear on a shared map, where managers can search any batch and see where it is and how it has moved. Access is limited to people the company’s admin adds, with roles enforced by the server.</p>
+
+<h2>2. The problem</h2>
+<ul>
+  <li><b>Manual transcription.</b> Batch and heat numbers are copied by hand, and one wrong character breaks traceability.</li>
+  <li><b>Unknown location.</b> Which yard, bay or stack a coil is in lives in people’s memory, which slows dispatch and stock checks.</li>
+  <li><b>No proof.</b> There is no timestamped, located photo when a customer or transporter disputes a coil.</li>
+  <li><b>The QR code alone is not enough.</b> Decoding real AM/NS India tags shows their QR codes carry only the batch ID (plus a QCI “Made in India” verification link on certified coils). Everything else exists only as printed text, so a simple QR scanner captures almost nothing.</li>
+</ul>
+
+<h2>3. What the app does</h2>
+<table>
+  <tr><th style="width:30%">Capability</th><th>Description</th></tr>
+  <tr><td><b>Tag reading</b></td><td>Decodes all QR codes on the tag, including small secondary codes, and reads the printed fields: manufacturer, product, batch ID, size, net and gross weight, grade, heat number, specification, manufacture date, pack type and customer.</td></tr>
+  <tr><td><b>QR as ground truth</b></td><td>The batch ID is taken from the QR code; the printed batch is cross-checked against it, with look-alike characters (O/0, I/1, S/5) handled so only real mismatches are flagged.</td></tr>
+  <tr><td><b>Human confirmation</b></td><td>The worker sees the photo, which can be zoomed, next to the extracted fields and can correct any field before saving.</td></tr>
+  <tr><td><b>GPS geotagging</b></td><td>The position is captured at the moment of the photo, its accuracy is shown, and a weak fix needs confirmation. Locations from fake-GPS apps are flagged on the record.</td></tr>
+  <tr><td><b>Photo evidence</b></td><td>GPS, time and “Manufacturer | Batch | Product” are written into the photo. The full-resolution photo is kept in the phone’s gallery and a compressed copy of about 200 KB is stored in the cloud.</td></tr>
+  <tr><td><b>Offline-first</b></td><td>Reading happens on the phone. Saved scans queue on the device and upload automatically when signal returns, without duplicates.</td></tr>
+  <tr><td><b>Live shared map</b></td><td>Every coil is pinned on a map; scanning the same batch elsewhere draws its movement trail. Search by batch or manufacturer, and tap a pin for details and the photo.</td></tr>
+  <tr><td><b>Admin-managed accounts</b></td><td>There is no public sign-up. The admin creates logins, including usernames for staff without email, and issues a temporary password that must be changed at first sign-in. The admin can also reset passwords, remove people and assign roles: viewer, scanner or admin.</td></tr>
+  <tr><td><b>Data export</b></td><td>All scans can be exported to CSV/Excel for reports and existing systems.</td></tr>
+</table>
+
+<h2 class="pb">4. How it works</h2>
+<table>
+  <tr><th style="width:6%">#</th><th style="width:20%">Step</th><th>What happens</th></tr>
+  <tr><td>1</td><td>Photograph</td><td>The worker photographs the tag with the phone camera, or picks an existing photo.</td></tr>
+  <tr><td>2</td><td>Read</td><td>On-device machine learning decodes the QR codes and reads the printed text; no internet is needed.</td></tr>
+  <tr><td>3</td><td>Check</td><td>The fields are pre-filled; the worker confirms them or corrects them.</td></tr>
+  <tr><td>4</td><td>Geotag</td><td>GPS position and time are attached to the record and written into the photo.</td></tr>
+  <tr><td>5</td><td>Sync and map</td><td>The scan uploads when online and appears on every authorised user’s map.</td></tr>
+</table>
+
+<h3>Technology</h3>
+<div class="cols">
+  <ul>
+    <li><b>App:</b> native Android (Kotlin, Jetpack Compose), Android 8.0 and later</li>
+    <li><b>Tag reading:</b> Google ML Kit, with bundled on-device models</li>
+    <li><b>Maps:</b> OpenStreetMap</li>
+  </ul>
+  <ul>
+    <li><b>Backend:</b> Supabase (PostgreSQL, authentication, private file storage), Mumbai region</li>
+    <li><b>Security:</b> row-level security on every table; admin actions run in a server function</li>
+    <li><b>Distribution:</b> private Google Play track (not publicly listed)</li>
+  </ul>
+</div>
+
+<h2>5. Security and data handling</h2>
+<ul>
+  <li>Only people the admin creates can sign in, and new staff must set their own password at first login.</li>
+  <li>Roles are enforced by the database server, not only by the app, so a modified app cannot read or change data it is not allowed to.</li>
+  <li>Tag photos are stored privately and open only through links that expire after one hour, for signed-in staff.</li>
+  <li>No secret keys are shipped in the app. The master key exists only on the server.</li>
+  <li>Removing a person cuts their access immediately, and their past scans remain on record.</li>
+  <li>Data is hosted in India (Mumbai region) and stays the property of the client.</li>
+</ul>
+
+<h2>6. Current status</h2>
+<div class="box">
+  <p><b>A working prototype exists today</b>, made up of the Android app and the cloud backend.</p>
+  <ul>
+    <li>Tested on two real AM/NS India tag formats (galvanized and HR coil): 10 fields read from a single photo, and all 3 QR codes on the sample tags decoded.</li>
+    <li>GPS accuracy of ±6 to 13 m measured on an Android phone in the field.</li>
+    <li>29 server-side security and access-control checks, all passing.</li>
+  </ul>
+  <p class="muted" style="margin:0">Not yet validated: other manufacturers’ tag layouts, heavy daily use, or a full yard’s worth of staff. The pilot in this proposal addresses exactly these.</p>
+</div>
+
+<h2>7. Future scope</h2>
+<table>
+  <tr><th style="width:24%">Phase</th><th>Capabilities</th></tr>
+  <tr><td><b>Phase 2</b><br><span class="muted">3 to 6 months</span></td><td>Yard zones and bay/stack numbers · dispatch and gate-pass verification (scan at loading, match to order) · filtered reports and scheduled Excel exports · Hindi and regional-language interface · support for additional tag formats (Tata Steel, JSW, SAIL)</td></tr>
+  <tr><td><b>Phase 3</b><br><span class="muted">6 months and beyond</span></td><td>ERP/SAP integration · stock reconciliation (expected vs scanned) · alerts for coils not seen in a set period or found in the wrong yard · web dashboard and iPhone app · analytics on coil movement and dwell time</td></tr>
+</table>
+<p class="muted">Future phases are quoted separately after the pilot, based on what the yard needs most.</p>
+
+<h2 class="pb">8. Proposal</h2>
+<h3>8.1 Scope of work</h3>
+<p>Deliver, deploy and support CoilTag for <b>one yard / site</b> of <span class="ph">[Client company]</span>, including:</p>
+<ul>
+  <li>Android app branded for the client, with the capabilities in section 3</li>
+  <li>Cloud backend set up under the client’s account, with roles, admin-managed accounts and private photo storage</li>
+  <li>Tag-reading tuned and tested on up to <b>3 tag formats</b> supplied by the client</li>
+  <li>Private distribution on Google Play to the client’s staff</li>
+  <li>On-site or remote training for admins and yard staff</li>
+  <li>4 weeks of pilot support, including bug fixes and adjustments</li>
+  <li>Admin guide, CSV export and full handover of backend access</li>
+</ul>
+
+<h3>8.2 Timeline</h3>
+<table>
+  <tr><th style="width:22%">Week</th><th>Activity</th><th style="width:28%">Milestone</th></tr>
+  <tr><td>Week 1</td><td>Kick-off, branding, backend set-up, tag tuning on client samples</td><td>Test build delivered</td></tr>
+  <tr><td>Week 2</td><td>Staff accounts, training, deployment on Google Play</td><td><b>Pilot go-live</b></td></tr>
+  <tr><td>Weeks 3–4</td><td>Daily use in the yard, fixes, measurement of agreed success criteria</td><td>Pilot review</td></tr>
+  <tr><td>Weeks 5–6</td><td>Remaining support period, documentation, handover</td><td><b>Acceptance</b></td></tr>
+</table>
+
+<h3>8.3 Commercials</h3>
+<table>
+  <tr><th>Item</th><th class="num" style="width:22%">Amount (₹)</th></tr>
+  <tr><td>Android app set-up, client branding and customisation</td><td class="num">25,000</td></tr>
+  <tr><td>Secure cloud backend, roles and admin-managed accounts</td><td class="num">15,000</td></tr>
+  <tr><td>Tag-reading tuning and testing for up to 3 tag formats</td><td class="num">12,000</td></tr>
+  <tr><td>Private Google Play deployment and staff training</td><td class="num">10,000</td></tr>
+  <tr><td>4 weeks of pilot support and fixes</td><td class="num">10,000</td></tr>
+  <tr><td>Admin guide, data export and handover</td><td class="num">8,000</td></tr>
+  <tr class="total"><td>Total (one-time)</td><td class="num">₹80,000</td></tr>
+</table>
+<p class="muted">Taxes: GST extra, if applicable. Amount in words: Rupees Eighty Thousand only.</p>
+
+<h3>8.4 Payment terms</h3>
+<table>
+  <tr><th>Milestone</th><th class="num" style="width:14%">Share</th><th class="num" style="width:22%">Amount (₹)</th></tr>
+  <tr><td>On signing this proposal</td><td class="num">40%</td><td class="num">32,000</td></tr>
+  <tr><td>At pilot go-live (end of week 2)</td><td class="num">40%</td><td class="num">32,000</td></tr>
+  <tr><td>On acceptance (end of week 6)</td><td class="num">20%</td><td class="num">16,000</td></tr>
+</table>
+
+<h3>8.5 Not included</h3>
+<ul>
+  <li>Cloud hosting beyond the free tier. The prototype runs on the free plan. For daily production use, the paid plan (about US$25 a month) is recommended for uninterrupted service and daily backups, payable by the client directly to the provider.</li>
+  <li>Google Play developer registration (US$25, one-time) if the app is published under the client’s own account</li>
+  <li>Phones or other hardware</li>
+  <li>ERP/SAP integration and the future-scope items in section 7, which are quoted separately</li>
+</ul>
+
+<h3>8.6 Client responsibilities</h3>
+<ul>
+  <li>Provide sample photos of each tag format to be supported, and a point of contact for the pilot</li>
+  <li>Provide Android phones (Android 8.0 or later) with GPS for yard staff</li>
+  <li>Nominate admin users and confirm the staff list</li>
+  <li>Agree measurable success criteria for the pilot at kick-off</li>
+</ul>
+
+<h3>8.7 Acceptance, support and ownership</h3>
+<ul>
+  <li><b>Acceptance:</b> the pilot is accepted when the success criteria agreed at kick-off are met, or after 10 working days without a reported blocking issue.</li>
+  <li><b>Warranty:</b> defects reported within 30 days of acceptance are fixed at no charge. An ongoing maintenance plan is available on request.</li>
+  <li><b>Data:</b> all scan data and photos belong to the client and can be exported at any time.</li>
+  <li><b>Software licence:</b> <span class="ph">[to be agreed: perpetual licence to use, or full transfer of source code]</span>.</li>
+</ul>
+
+<div class="sign">
+  <div>For <span class="ph">[Client company]</span><br><br>Name, designation, signature and date</div>
+  <div>For <span class="ph">[Your name / company]</span><br><br>Name, signature and date</div>
+</div>
+
+</body>
+</html>
